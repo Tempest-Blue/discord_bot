@@ -1,0 +1,52 @@
+# See https://help.github.com/articles/ignoring-files/ for more about ignoring files.
+
+# dependencies
+node_modules/
+/.pnp
+.pnp.js
+package-lock.json
+
+# testing
+coverage/
+
+# production
+build/
+dist/
+packages/scripts/*.csv
+
+# Serverless directories
+.serverless
+.webpack
+
+# caches
+.eslintcache
+.temp
+
+# misc
+.DS_Store
+
+# secrets
+.env*
+
+# logs
+*.log*
+
+# IDE
+.idea/
+*.iml
+
+#amplify
+amplify/\#current-cloud-backend
+amplify/.config/local-*
+amplify/mock-data
+amplify/backend/amplify-meta.json
+amplify/backend/awscloudformation
+build/
+dist/
+node_modules/
+aws-exports.js
+awsconfiguration.json
+amplifyconfiguration.json
+amplify-build-config.json
+amplify-gradle-config.json
+amplifytools.xcconfig
