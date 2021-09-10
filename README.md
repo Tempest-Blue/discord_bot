@@ -6,6 +6,7 @@
 client.login({Key Here})
 ```
 - Add your sound clip trigger and file path
+- Update channel ids
 - Run file with command 
 ```
 node tempestbot.js
