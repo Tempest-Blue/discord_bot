@@ -1,7 +1,7 @@
 ﻿# Discord bot for streaming sound bites
 
 - Add new sound clips to the sounds folder
-- Modify tempestbot.js with your server's credentials 
+- Modify discord_bot.js with your server's credentials 
 ```
 client.login({Key Here})
 ```
@@ -9,5 +9,5 @@ client.login({Key Here})
 - Update channel ids
 - Run file with command 
 ```
-node tempestbot.js
+node discord_bot.js
 ```

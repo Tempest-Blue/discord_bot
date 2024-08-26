@@ -2,13 +2,17 @@
   "name": "Discord",
   "version": "1.0.0",
   "description": "",
-  "main": "tempestbot.js",
+  "main": "discord_bot.js",
   "scripts": {
     "test": "echo \"Error: no test specified\" && exit 1"
   },
   "keywords": [],
   "author": "",
   "license": "ISC",
+  "private": true,
+  "workspaces": [
+    "packages/*"
+  ],
   "dependencies": {
     "@discordjs/opus": "0.9.0",
     "@discordjs/voice": "0.16.1",
@@ -21,6 +25,6 @@
     "nvm": "0.0.4",
     "winston": "^3.2.1",
     "ytdl-core": "^4.1.1",
-    "discord": "file:'../gun_scraper/utilities/discord.js'"
+    "gun_scraper": "git+https://github.com/Tempest-Blue/gun_scraper.git"
   }
 }

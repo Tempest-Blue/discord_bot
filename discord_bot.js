@@ -1,5 +1,5 @@
 const fs = require("fs");
-const env = require("./.env.json");
+const env = require("config/.env.json");
 const {
   joinVoiceChannel,
   createAudioPlayer,
@@ -7,7 +7,8 @@ const {
   AudioPlayerStatus,
 } = require("@discordjs/voice");
 const { Client, Events, GatewayIntentBits, Partials } = require("discord.js");
-const discord = require("discord");
+const database = require("gun_scraper/database");
+const _ = require("lodash");
 
 const client = new Client({
   intents: [
@@ -126,12 +127,34 @@ client.on(Events.MessageCreate, async (interaction) => {
       await interaction.reply({
         content: "Pong",
       });
-    } else if (message == "!keywords") {
-      const test = discord.get_search_keywords();
-      console.log(test);
-      // get data
-      // await interaction.reply({
-      // })
+    } else if (
+      _.startsWith(message, "!subscribe firearm") ||
+      _.startsWith(message, "!subscribe accessory")
+    ) {
+      let keywords = _.chain(message).split(" ").get("[2]").value();
+      keywords = keywords.split(",");
+      const type = _.chain(message).split(" ").get("[1]").value();
+      const user_id = interaction.author.id;
+      const user_name = interaction.author.globalName;
+      if (!keywords || !keywords.length) {
+        const found_keywords = await database.get_user_keywords({
+          user_id,
+          user_name,
+          type,
+        });
+        await interaction.reply({
+          content: found_keywords.length
+            ? `Your subscribed keywords for ${type} are ${found_keywords.join(
+                ","
+              )}`
+            : "No found keywords",
+        });
+      }
+
+      if (type == "firearm")
+        await database.subscribe_firearm(user_id, user_name, keywords);
+      else if (type == "accessory")
+        await database.subscribe_accessory(user_id, user_name, keywords);
     } else if (
       interaction.guild &&
       messages[message] &&
