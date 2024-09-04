@@ -129,32 +129,37 @@ client.on(Events.MessageCreate, async (interaction) => {
       });
     } else if (
       _.startsWith(message, "!subscribe firearm") ||
-      _.startsWith(message, "!subscribe accessory")
+      _.startsWith(message, "!subscribe accessory") ||
+      _.startsWith(message, "!unsubscribe firearm") ||
+      _.startsWith(message, "!unsubscribe accessory")
     ) {
-      let keywords = _.chain(message).split(" ").get("[2]").value();
-      keywords = keywords.split(",");
+      const action = _.chain(message)
+        .split(" ")
+        .get("[0]")
+        .value()
+        .substring(1);
       const type = _.chain(message).split(" ").get("[1]").value();
+      let keywords = _.chain(message).split(" ").get("[2]").value();
       const user_id = interaction.author.id;
       const user_name = interaction.author.globalName;
-      if (!keywords || !keywords.length) {
-        const found_keywords = await database.get_user_keywords({
-          user_id,
-          user_name,
-          type,
-        });
+
+      if (keywords) {
+        keywords = keywords.split(",");
+        if (type == "firearm") {
+          action == "subscribe"
+            ? await database.subscribe_firearm(user_id, user_name, keywords)
+            : await database.unsubscribe_firearm(user_id, keywords);
+        } else if (type == "accessory") {
+          action == "subscribe"
+            ? await database.subscribe_accessory(user_id, user_name, keywords)
+            : await database.unsubscribe_accessory(user_id, keywords);
+        }
+        await return_user_keywords({ user_id, user_name, type, interaction });
+      } else {
         await interaction.reply({
-          content: found_keywords.length
-            ? `Your subscribed keywords for ${type} are ${found_keywords.join(
-                ","
-              )}`
-            : "No found keywords",
+          content: `Missing keywords you want ${action}d`,
         });
       }
-
-      if (type == "firearm")
-        await database.subscribe_firearm(user_id, user_name, keywords);
-      else if (type == "accessory")
-        await database.subscribe_accessory(user_id, user_name, keywords);
     } else if (
       interaction.guild &&
       messages[message] &&
@@ -180,23 +185,16 @@ client.on(Events.MessageCreate, async (interaction) => {
   }
 });
 
-// client.on('voiceStateUpdate', (oldState, newState) => {
-//   if (oldState.channelID == newState.channelID) {
-//     return;
-//   }
-//   channelNames = [
-//     'In a Meeting',
-//     '1000% Focus',
-//     'Away From Keyboard',
-//   ];
-//   if (channelNames.find((name) => { return name == newState.channel.name })) {
-//     newState.setMute(true);
-//     newState.setDeaf(true);
-//   }
-//   else {
-//     newState.setMute(false);
-//     newState.setDeaf(false);
-//   }
-// });
-
+async function return_user_keywords({ user_id, user_name, type, interaction }) {
+  const found_keywords = await database.get_user_keywords({
+    user_id,
+    user_name,
+    type,
+  });
+  await interaction.reply({
+    content: found_keywords.length
+      ? `Your subscribed ${type} keywords are ${found_keywords.join(",")}`
+      : "Your keywords list is empty",
+  });
+}
 client.login(env["Joe"]).then((response) => console.log("Logged In", response));
