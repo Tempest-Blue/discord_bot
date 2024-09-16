@@ -6,7 +6,13 @@ const {
   createAudioResource,
   AudioPlayerStatus,
 } = require("@discordjs/voice");
-const { Client, Events, GatewayIntentBits, Partials } = require("discord.js");
+const {
+  Client,
+  Events,
+  GatewayIntentBits,
+  Partials,
+  inlineCode,
+} = require("discord.js");
 const database = require("gun_scraper/database");
 const _ = require("lodash");
 
@@ -128,37 +134,44 @@ client.on(Events.MessageCreate, async (interaction) => {
         content: "Pong",
       });
     } else if (
-      _.startsWith(message, "!subscribe firearm") ||
-      _.startsWith(message, "!subscribe accessory") ||
-      _.startsWith(message, "!unsubscribe firearm") ||
-      _.startsWith(message, "!unsubscribe accessory")
+      _.startsWith(message, "!sub firearm") ||
+      _.startsWith(message, "!sub accessory") ||
+      _.startsWith(message, "!unsub firearm") ||
+      _.startsWith(message, "!unsub accessory")
     ) {
-      const action = _.chain(message)
-        .split(" ")
-        .get("[0]")
-        .value()
-        .substring(1);
-      const type = _.chain(message).split(" ").get("[1]").value();
-      let keywords = _.chain(message).split(" ").get("[2]").value();
-      const user_id = interaction.author.id;
+      const first_space = message.indexOf(" ");
+      const second_space = message.indexOf(" ", first_space + 1);
+      const action = message.substring(1, first_space);
+      const type = message.substring(first_space + 1, second_space);
+      let keywords = message.substring(second_space + 1);
+      const user_discord_id = interaction.author.id;
       const user_name = interaction.author.globalName;
 
       if (keywords) {
         keywords = keywords.split(",");
         if (type == "firearm") {
-          action == "subscribe"
-            ? await database.subscribe_firearm(user_id, user_name, keywords)
-            : await database.unsubscribe_firearm(user_id, keywords);
+          action == "sub"
+            ? await database.subscribe_firearm({
+                user_discord_id,
+                user_name,
+                keywords,
+              })
+            : await database.unsubscribe_firearm({ user_discord_id, keywords });
         } else if (type == "accessory") {
-          action == "subscribe"
-            ? await database.subscribe_accessory(user_id, user_name, keywords)
-            : await database.unsubscribe_accessory(user_id, keywords);
+          action == "sub"
+            ? await database.subscribe_accessory({
+                user_discord_id,
+                user_name,
+                keywords,
+              })
+            : await database.unsubscribe_accessory({
+                user_discord_id,
+                keywords,
+              });
         }
-        await return_user_keywords({ user_id, user_name, type, interaction });
+        await return_user_keywords({ user_discord_id, interaction });
       } else {
-        await interaction.reply({
-          content: `Missing keywords you want ${action}d`,
-        });
+        await return_user_keywords({ user_discord_id, interaction });
       }
     } else if (
       interaction.guild &&
@@ -185,16 +198,29 @@ client.on(Events.MessageCreate, async (interaction) => {
   }
 });
 
-async function return_user_keywords({ user_id, user_name, type, interaction }) {
-  const found_keywords = await database.get_user_keywords({
-    user_id,
-    user_name,
-    type,
+async function return_user_keywords({ user_discord_id, interaction }) {
+  const found_keywords = await database.get_user_keywords_by_discord_id({
+    user_discord_id,
   });
+  let firearm_keywords = [];
+  let accessory_keywords = [];
+  for (const keyword of found_keywords) {
+    if (keyword.firearm == true) {
+      firearm_keywords.push(keyword.keyword);
+    }
+    if (keyword.accessory == true) {
+      accessory_keywords.push(keyword.keyword);
+    }
+  }
+  firearm_reply = firearm_keywords.length
+    ? `Subbed firearm keywords: ${inlineCode(firearm_keywords.join(","))}`
+    : `Subbed firearm keyword list is empty`;
+  accessory_reply = accessory_keywords.length
+    ? `Subbed accessory keywords: ${inlineCode(accessory_keywords.join(","))}`
+    : `Subbed accessory keyword list is empty`;
   await interaction.reply({
-    content: found_keywords.length
-      ? `Your subscribed ${type} keywords are ${found_keywords.join(",")}`
-      : "Your keywords list is empty",
+    content: firearm_reply + "\n" + accessory_reply,
   });
 }
+
 client.login(env["Joe"]).then((response) => console.log("Logged In", response));
