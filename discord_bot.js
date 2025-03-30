@@ -1,17 +1,19 @@
 // Utilities
 const fs = require('fs');
+const path = require('path');
 const _ = require('lodash');
 
 // Discord Bot Config
 const env = require('config/.env.json');
-const { sound_bytes } = require('config/sound_bytes.js');
-const { Client, Events, GatewayIntentBits, Partials, inlineCode } = require('discord.js');
 const {
-  joinVoiceChannel,
-  createAudioPlayer,
-  createAudioResource,
-  AudioPlayerStatus,
-} = require('@discordjs/voice');
+  Client,
+  Collection,
+  Events,
+  GatewayIntentBits,
+  Partials,
+  MessageFlags,
+  EmbedBuilder,
+} = require('discord.js');
 
 // Database Interactions
 const database = require('gun_scraper/database');
@@ -27,131 +29,143 @@ const client = new Client({
   ],
   partials: [Partials.Channel, Partials.Message],
 });
-let connection;
 
-client.login(env['Joe']).then((response) => console.log('Logged In', response));
+client.commands = new Collection();
+const foldersPath = path.join(__dirname, 'commands');
+const commandFolders = fs.readdirSync(foldersPath);
+for (const folder of commandFolders) {
+  const commandsPath = path.join(foldersPath, folder);
+  const commandFiles = fs.readdirSync(commandsPath).filter((file) => file.endsWith('.js'));
+  for (const file of commandFiles) {
+    const filePath = path.join(commandsPath, file);
+    const command = require(filePath);
+    // Set a new item in the Collection with the key as the command name and the value as the exported module
+    if ('data' in command && 'execute' in command) {
+      client.commands.set(command.data.name, command);
+    } else {
+      console.log(
+        `[WARNING] The command at ${filePath} is missing a required "data" or "execute" property.`
+      );
+    }
+  }
+}
 
-client.once(Events.ClientReady, (readyClient) => {
+client.login(env['redx_server_token']).then((response) => console.log('Logged In', response));
+
+client.on(Events.InteractionCreate, async (interaction) => {
+  try {
+    // 🟦 Slash command handler
+    if (interaction.isChatInputCommand()) {
+      const command = interaction.client.commands.get(interaction.commandName);
+
+      if (!command) {
+        console.error(`No command matching ${interaction.commandName} was found.`);
+        return;
+      }
+
+      await command.execute(interaction);
+      return;
+    }
+
+    // 🟩 Autocomplete handler
+    else if (interaction.isAutocomplete()) {
+      const command = interaction.client.commands.get(interaction.commandName);
+
+      if (!command) {
+        console.error(`No command matching ${interaction.commandName} was found.`);
+        return;
+      }
+
+      try {
+        await command.autocomplete(interaction);
+      } catch (error) {
+        console.error(`Autocomplete error for ${interaction.commandName}:`, error);
+      }
+
+      return;
+    }
+
+    // 🟨 Button interaction handler
+    else if (interaction.isButton()) {
+      if (interaction.customId === 'mark_as_read') {
+        await discord.mark_dms_as_read({
+          client,
+          user_discord_id: interaction.user.id,
+        });
+      }
+
+      // Add more button handlers as needed
+      return;
+    }
+
+    // 🟧 Add more interaction types (select menus, modals) as needed here
+  } catch (error) {
+    console.error('Interaction handler error:', error);
+
+    const error_response = {
+      content: 'There was an error while executing this interaction!',
+      flags: MessageFlags.Ephemeral,
+    };
+
+    if (interaction.replied || interaction.deferred) {
+      await interaction.followUp(error_response);
+    } else {
+      await interaction.reply(error_response);
+    }
+  }
+});
+
+client.once(Events.ClientReady, async (readyClient) => {
   console.log(`Ready! Logged in as ${readyClient.user.tag}`);
+  // await broadcast_update();
 });
 
-const general_commands = {
-  '!ping': async (interaction) => {
-    await interaction.reply('Pong');
-  },
-  '!help': async (interaction) => {
-    const available_commands = Object.keys(sound_bytes).join('\n');
-    await interaction.reply(`Available Commands:\n${available_commands}`);
-  },
-};
+async function broadcast_update() {
+  const update_notification = new EmbedBuilder()
+    .setTitle('🚨     UPDATES     🚨')
+    .setDescription(
+      `
+        **Subscription Changes**  
+        • Deprecated \`!sub\` / \`!unsub\` text messages  
+        • Use slash command \`/keyword\`
 
-const is_subscription_command = (message) => {
-  const subscription_commands = [
-    '!sub firearm',
-    '!sub accessory',
-    '!unsub firearm',
-    '!unsub accessory',
-  ];
-  return subscription_commands.some((cmd) => _.startsWith(message, cmd));
-};
+        **PM Changes**
+        • Mark recent as read button changes last 50 posts' color to red
+        • Color coding
+          🟪 - Posts from GunDeals  
+          🟧 - Posts specifically for firearms  
+          🟥 - Posts already read  
+          🟦 - Default color for everything else  
+        • Labels
+          🔫 - Firearms
+          🪖 - Accessories
+      `
+    )
+    .setColor('#57f287');
 
-client.on(Events.MessageCreate, async (interaction) => {
-  if (!interaction.author.bot) {
-    const message = interaction.content.trim();
+  const guilds = await client.guilds.fetch();
+  let guild = guilds.find((guild) => guild.name.toLowerCase() == "redx's server");
+  const guild_id = guild.id;
+  guild = await client.guilds.fetch(guild_id);
+  const channels = await guild.channels.fetch();
+  const found_channel = channels.find((channel) => channel.name === 'gunz-online');
+  if (found_channel.isTextBased() && 'threads' in found_channel) {
+    const thread_list = await found_channel.threads.fetchActive();
 
-    if (general_commands[message]) {
-      await general_commands[message](interaction);
-      return;
+    const found_thread = thread_list.threads.find(
+      (thread) => thread.name.toLowerCase() === 'keyword notifications'.toLowerCase()
+    );
+
+    if (found_thread) {
+      await found_thread.send({ embeds: [update_notification] });
     }
-    // Handle subscription commands
-    if (is_subscription_command(message)) {
-      await parse_firearm_command({ message, interaction });
-      return;
-    }
-
-    // Handle sound byte commands
-    if (interaction.guild && sound_bytes[message]?.url) {
-      await play_sound_byte({ interaction });
-      return;
-    }
-  }
-});
-
-client.on('interactionCreate', async (interaction) => {
-  if (!interaction.isButton()) return;
-
-  if (interaction.customId === 'mark_as_read') {
-    await discord.mark_dms_as_read({ client, user_discord_id: interaction.user.id });
-  }
-});
-
-async function play_sound_byte({ interaction }) {
-  connection = await joinVoiceChannel({
-    channelId: interaction.member.voice.channel.id,
-    guildId: interaction.guild.id,
-    adapterCreator: interaction.guild.voiceAdapterCreator,
-  });
-  if (!connection) {
-    connection.destroy();
   }
 
-  const player = createAudioPlayer({});
-  player.on(AudioPlayerStatus.Playing, () => {
-    console.log('The audio player has started playing!');
-  });
-  const resource = createAudioResource(sound_bytes[message].url);
-  player.play(resource);
-}
-
-async function parse_firearm_command({ message, interaction }) {
-  const [action, type] = message.substring(1).split(' ', 2);
-  let keyword_string = message.substring(3 + action.length + type.length);
-  let keywords = keyword_string ? keyword_string.split(',') : [];
-  keywords = keywords.map((keyword) => keyword.trim());
-  keywords = keywords.filter((keyword) => keyword);
-  const user_discord_id = interaction.author.id;
-  const user_name = interaction.author.globalName;
-
-  const command_map = {
-    firearm: {
-      sub: async () => database.subscribe_firearm({ user_discord_id, user_name, keywords }),
-      unsub: async () => database.unsubscribe_firearm({ user_discord_id, keywords }),
-    },
-    accessory: {
-      sub: async () => database.subscribe_accessory({ user_discord_id, user_name, keywords }),
-      unsub: async () => database.unsubscribe_accessory({ user_discord_id, keywords }),
-    },
-  };
-
-  if (keywords && _.get(command_map, `${type}.${action}`)) {
-    await command_map[type][action]();
+  const subscriber_ids = await database.get_all_subscriber_discord_ids();
+  for (const subscriber of subscriber_ids) {
+    const subscriber_id = subscriber.discord_id;
+    await client.users.fetch(subscriber_id).then(async (user) => {
+      await user.send({ embeds: [update_notification] });
+    });
   }
-
-  await return_user_keywords({ user_discord_id, interaction });
-}
-
-async function return_user_keywords({ user_discord_id, interaction }) {
-  const found_keywords = await database.get_user_keywords_by_discord_id({
-    user_discord_id,
-  });
-  const firearm_keywords = found_keywords
-    .filter((keyword) => keyword.firearm)
-    .map((keyword) => keyword.keyword.toUpperCase())
-    .sort();
-
-  const accessory_keywords = found_keywords
-    .filter((keyword) => keyword.accessory)
-    .map((keyword) => keyword.keyword.toUpperCase())
-    .sort();
-
-  const firearm_reply = firearm_keywords
-    ? `Subbed firearm keywords: \n${inlineCode(firearm_keywords.join(', '))}`
-    : 'Subbed firearm keyword list is empty';
-  const accessory_reply = accessory_keywords
-    ? `Subbed accessory keywords: \n${inlineCode(accessory_keywords.join(', '))}`
-    : 'Subbed accessory keyword list is empty';
-
-  await interaction.reply({
-    content: `${firearm_reply}\n${accessory_reply}`,
-  });
 }
