@@ -15,6 +15,7 @@ const {
 
 // Database Interactions
 const database = require('gun_scraper/database');
+const discord = require('gun_scraper/discord');
 
 const client = new Client({
   intents: [
@@ -73,6 +74,14 @@ client.on(Events.MessageCreate, async (interaction) => {
       await play_sound_byte({ interaction });
       return;
     }
+  }
+});
+
+client.on('interactionCreate', async (interaction) => {
+  if (!interaction.isButton()) return;
+
+  if (interaction.customId === 'mark_as_read') {
+    await discord.mark_dms_as_read({ client, user_discord_id: interaction.user.id });
   }
 });
 
