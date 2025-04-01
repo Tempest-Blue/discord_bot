@@ -1,5 +1,5 @@
 const { SlashCommandBuilder } = require('discord.js');
-const { sound_bytes } = require('config/sound_bytes.js'); // adjust as needed
+const { sound_bytes } = require('../../utilities/sound_byte_paths'); // adjust as needed
 
 module.exports = {
   data: new SlashCommandBuilder()

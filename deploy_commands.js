@@ -1,5 +1,5 @@
 const { REST, Routes } = require('discord.js');
-const { client_id, guild_id, redx_server_token: token } = require('./packages/config/.env.json');
+const { client_id, guild_id, redx_server_token: token } = require('gun_scraper/setup_env');
 const fs = require('node:fs');
 const path = require('node:path');
 

@@ -95,8 +95,9 @@ async function parse_firearm_command({ action, type, keyword_string, interaction
     },
   };
 
+  type = type.replaceAll(' ', '_');
   if (keywords && _.get(command_map, `${type}.${action}`)) {
-    await command_map[type.replace(' ', '_')][action]();
+    await command_map[type][action]();
   }
 
   await return_user_keywords({ user_discord_id, interaction });

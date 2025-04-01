@@ -4,7 +4,7 @@ const path = require('path');
 const _ = require('lodash');
 
 // Discord Bot Config
-const env = require('config/.env.json');
+const secrets = require('gun_scraper/setup_env');
 const {
   Client,
   Collection,
@@ -50,7 +50,7 @@ for (const folder of commandFolders) {
   }
 }
 
-client.login(env['redx_server_token']).then((response) => console.log('Logged In', response));
+client.login(secrets['redx_server_token']).then((response) => console.log('Logged In', response));
 
 client.on(Events.InteractionCreate, async (interaction) => {
   try {

@@ -1,6 +1,6 @@
 // commands/sound.js
 const { SlashCommandBuilder } = require('discord.js');
-const { sound_bytes } = require('config/sound_bytes.js');
+const { sound_bytes } = require('../../utilities/sound_byte_paths');
 const {
   joinVoiceChannel,
   createAudioPlayer,
